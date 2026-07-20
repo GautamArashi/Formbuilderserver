@@ -119,20 +119,51 @@ export const googleAuth = async (req: Request, res: Response): Promise<void> => 
       throw new Error('GOOGLE_CLIENT_ID is not defined in environment variables');
     }
 
-    // Verify Google ID Token
-    const ticket = await googleClient.verifyIdToken({
-      idToken: credential,
-      audience: clientId,
-    });
+    let email: string | undefined;
+    let name: string | undefined;
+    let googleId: string | undefined;
 
-    const payload = ticket.getPayload();
-    if (!payload) {
-      res.status(400).json({ message: 'Invalid Google credential token' });
-      return;
+    // Check if the credential is a JWT (ID Token) or an access token
+    if (credential.includes('.')) {
+      // Verify Google ID Token
+      const ticket = await googleClient.verifyIdToken({
+        idToken: credential,
+        audience: clientId,
+      });
+
+      const payload = ticket.getPayload();
+      if (!payload) {
+        res.status(400).json({ message: 'Invalid Google credential token' });
+        return;
+      }
+      email = payload.email;
+      name = payload.name;
+      googleId = payload.sub;
+    } else {
+      // Verify Google Access Token by calling UserInfo endpoint
+      try {
+        const response = await googleClient.request<{ email?: string; name?: string; sub?: string }>({
+          url: 'https://www.googleapis.com/oauth2/v3/userinfo',
+          headers: {
+            Authorization: `Bearer ${credential}`,
+          },
+        });
+        
+        const payload = response.data;
+        if (!payload || !payload.email || !payload.name || !payload.sub) {
+          res.status(400).json({ message: 'Google profile does not contain required fields' });
+          return;
+        }
+        email = payload.email;
+        name = payload.name;
+        googleId = payload.sub;
+      } catch (err) {
+        res.status(400).json({ message: 'Invalid Google access token', error: (err as Error).message });
+        return;
+      }
     }
 
-    const { email, name, sub: googleId } = payload;
-    if (!email || !name) {
+    if (!email || !name || !googleId) {
       res.status(400).json({ message: 'Google profile does not contain required fields' });
       return;
     }
