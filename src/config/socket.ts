@@ -6,7 +6,12 @@ let io: SocketServer | null = null;
 export const initSocket = (server: HttpServer): SocketServer => {
   io = new SocketServer(server, {
     cors: {
-      origin: ['https://tumhara-project-id.web.app', 'http://localhost:5173'],
+      origin: [
+        'https://form-builder-502905.web.app',
+        'https://form-builder-502905.firebaseapp.com',
+        'http://localhost:5173',
+        'http://localhost:3000'
+      ],
       methods: ['GET', 'POST'],
       credentials: true,
     },
